@@ -1,45 +1,29 @@
 import cv2
 import numpy as np
+from matplotlib import pyplot as plt
 
-
-def find_outer_contour(sign_contour):
-#    print(sign_contours[0])
-    return sign_contour[0]
-
-
-stopsign = cv2.imread('stopsign.jpg')
-vorfahrtsign = cv2.imread('vorfahrt.jpg')
-signs = [stopsign, vorfahrtsign]
-sign_contours = [cv2.findContours(cv2.Canny(sign, 100, 200), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[0] for sign in signs]
-
-
-
-cv2.waitKey(0)
-
-cap = cv2.VideoCapture(0)
+capture = cv2.VideoCapture('Autofahrt.mp4')
+print("hello world")
 while cv2.waitKey(1) != ord('q'):
-    _, frame = cap.read()
+    _, frame = capture.read()
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    lower_red = np.array([30, 150, 50])
+    upper_red = np.array([255, 255, 180])
+
+    mask = cv2.inRange(hsv, lower_red, upper_red)
+    res = cv2.bitwise_and(frame, frame, mask=mask)
+
+    cv2.imshow('Original', frame)
     edges = cv2.Canny(frame, 100, 200)
+    cv2.imshow('Edges', edges)
 
-    contoursimg = frame
-    contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    k = cv2.waitKey(5) & 0xFF
+    if k == 27:
+        break
 
-    stopsign_contour = sign_contours[0]
-    stopsign_outer_contour = find_outer_contour(stopsign_contour)
-
-    cv2.drawContours(stopsign, [stopsign_outer_contour], -1, (255, 0, 255), 5)
-    cv2.imshow('stop sign', stopsign)
-
-    for contour in contours:
-        similarity = cv2.matchShapes(contour, stopsign_outer_contour, cv2.CONTOURS_MATCH_I2, 0.0)
-        if similarity > .01:
-            similarity = .01
-        cv2.drawContours(contoursimg, [contour], -1, (255-similarity * 25500, 0, 0), 2)
-
-
-
-    cv2.imshow('contours', contoursimg)
-
+cv2.destroyAllWindows()
+capture.release()
 
 cv2.destroyAllWindows()
 cap.release()
