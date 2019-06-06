@@ -3,13 +3,16 @@ import numpy as np
 
 
 def find_outer_contour(sign_contour):
-    print(sign_contours[0])
+#    print(sign_contours[0])
     return sign_contour[0]
 
 
 stopsign = cv2.imread('stopsign.jpg')
-signs = [stopsign]
+vorfahrtsign = cv2.imread('vorfahrt.jpg')
+signs = [stopsign, vorfahrtsign]
 sign_contours = [cv2.findContours(cv2.Canny(sign, 100, 200), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[0] for sign in signs]
+
+
 
 cv2.waitKey(0)
 
