@@ -6,6 +6,19 @@ import argparse
 import numpy as np
 
 
+class Detection:
+    def __init__(self, contour):
+        self.contour = contour
+        self.emptyFrames = 0
+
+    def found(self, contour):
+        self.contour = contour
+        self.emptyFrames = 0
+
+    def notfound(self):
+        self.emptyFrames += 1
+
+
 def find_outer_contour(sign_contour):
     return sign_contour[0]
 
@@ -25,6 +38,10 @@ rotationoffset = [0, 0, 45, 0]
 boundingbox_symmetry = [8, 6, 1, 1]
 sign_contours = [cv2.findContours(cv2.Canny(sign, 100, 200), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[0] for sign in signs]
 minAreaRect = [cv2.minAreaRect(find_outer_contour(sign_contours[i])) for i in range(len(signs))]
+detections = [None for i in range(len(signs))]
+
+# How long an object has to be not found in order to discard its last location
+maxEmptyFrames = 5
 
 minContourArea = 200
 
@@ -84,6 +101,10 @@ while key != ord('q'):
     if not displaySourceImage:
         contoursimg[:] = (100, 100, 100)
     contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    for detection in detections:
+        if detection is not None:
+            detection.notfound()
 
     for i, contour in enumerate(contours):
         if cv2.contourArea(contour) < minContourArea:
@@ -149,9 +170,18 @@ while key != ord('q'):
 
 #                print(best_min_val)
                 if best_min_val < templateThreshold[bestSign]:
-                    cv2.drawContours(contoursimg, [contour], -1, highlightColors[bestSign], 2)
-                    cv2.imshow("search" + names[bestSign], search_image)
-                    cv2.imshow(names[bestSign], curtemplate)
+                    if detections[bestSign] is None:
+                        detections[bestSign] = Detection(contour)
+                    else:
+                        detections[bestSign].found(contour)
+
+    for i, detection in enumerate(detections):
+        if detection is None:
+            continue
+        if detection.emptyFrames > maxEmptyFrames:
+            detections[i] = None
+        else:
+            cv2.drawContours(contoursimg, [detection.contour], -1, highlightColors[i], 2)
 
     cv2.imshow('contours', contoursimg)
 
