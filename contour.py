@@ -15,11 +15,10 @@ vorfahrtsign = cv2.imread('vorfahrt.jpg')
 vorrangstrasse = cv2.imread('vorrangstrasse.png')
 durchfahrtverboten = cv2.imread('durchfahrtverboten.jpg')
 names = ["stop sign", "vorrang geben", "vorrang straße", "durchfahrt verboten"]
-signs = [stopsign, vorfahrtsign, vorrangstrasse]#, durchfahrtverboten]
+signs = [stopsign, vorfahrtsign, vorrangstrasse, durchfahrtverboten]
 limit = [.05, .05, 0.005, 0.005]
-#templateThreshold = [0.4, 0.15, 0.1, 1]
-templateThreshold = [0, 0.15, 0.15, 1]
-corners = [8, 3, 4, 0]
+templateThreshold = [0.25, 0.15, 0.15, .1]
+corners = [8, 3, 4, -15]
 highlightColors = [(255, 0, 0), (255, 0, 255), (0, 255, 0), (0, 255, 255)]
 # degrees offset of the sign from its best fit bounding box
 rotationoffset = [0, 0, 45, 0]
@@ -96,9 +95,9 @@ while key != ord('q'):
         bestSign = 0
         # match the contour with all known sign contours and save the best match
         for signIdx in range(len(signs)):
-            approxCorners = len(cv2.approxPolyDP(contour, 0.04 * cv2.arcLength(contour, True), True))
+            approxCorners = len(cv2.approxPolyDP(contour, 0.01 * cv2.arcLength(contour, True), True))
             similarity = cv2.matchShapes(contour, find_outer_contour(sign_contours[signIdx]), cv2.CONTOURS_MATCH_I2, 0.0)
-            if similarity < bestSim and (corners[signIdx] == 0 or corners[signIdx] == approxCorners):
+            if similarity < bestSim and ((corners[signIdx] <= 0 and approxCorners >= -corners[signIdx]) or abs(corners[signIdx] - approxCorners) <= 2):
                 bestSim = similarity
                 bestSign = signIdx
 
@@ -121,8 +120,7 @@ while key != ord('q'):
                 scale = min(width / signWidth, height / signHeight)
                 template = cv2.cvtColor(signs[bestSign], cv2.COLOR_BGR2GRAY)
 
-                margin = 5
-#                print(y-margin, y + height + margin, x-margin, x + width + margin)
+                margin = 15
 
                 search_top = max(0, int(y - margin))
                 search_bot = min(origFrame.shape[1], int(y + height + margin))
@@ -149,7 +147,7 @@ while key != ord('q'):
                         best_min_val = min_val
                         best_template = curtemplate
 
-                print(best_min_val)
+#                print(best_min_val)
                 if best_min_val < templateThreshold[bestSign]:
                     cv2.drawContours(contoursimg, [contour], -1, highlightColors[bestSign], 2)
                     cv2.imshow("search" + names[bestSign], search_image)
