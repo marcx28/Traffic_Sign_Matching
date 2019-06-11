@@ -7,9 +7,11 @@ import numpy as np
 
 
 class Detection:
-    def __init__(self, contour):
+    def __init__(self, contour, frame):
         self.contour = contour
         self.emptyFrames = 0
+        self.tracker = cv2.TrackerCSRT_create()
+        self.tracker.init(frame, cv2.boundingRect(contour))
 
     def found(self, contour):
         self.contour = contour
@@ -27,6 +29,7 @@ stopsign = cv2.imread('stopsign.jpg')
 vorfahrtsign = cv2.imread('vorfahrt.jpg')
 vorrangstrasse = cv2.imread('vorrangstrasse.png')
 durchfahrtverboten = cv2.imread('durchfahrtverboten.jpg')
+
 names = ["stop sign", "vorrang geben", "vorrang straße", "durchfahrt verboten"]
 signs = [stopsign, vorfahrtsign, vorrangstrasse, durchfahrtverboten]
 limit = [.05, .05, 0.005, 0.005]
@@ -41,7 +44,7 @@ minAreaRect = [cv2.minAreaRect(find_outer_contour(sign_contours[i])) for i in ra
 detections = [None for i in range(len(signs))]
 
 # How long an object has to be not found in order to discard its last location
-maxEmptyFrames = 5
+maxEmptyFrames = 500
 
 minContourArea = 200
 
@@ -116,12 +119,16 @@ while key != ord('q'):
         bestSign = 0
         # match the contour with all known sign contours and save the best match
         for signIdx in range(len(signs)):
+            # if we're already tracking one of these signs, no need to check for another
+            if detections[bestSign] is not None:
+                continue
+            # check if the similarity is close enough and the number of corners on the contour are about right
             approxCorners = len(cv2.approxPolyDP(contour, 0.01 * cv2.arcLength(contour, True), True))
             similarity = cv2.matchShapes(contour, find_outer_contour(sign_contours[signIdx]), cv2.CONTOURS_MATCH_I2, 0.0)
             if similarity < bestSim and ((corners[signIdx] <= 0 and approxCorners >= -corners[signIdx]) or abs(corners[signIdx] - approxCorners) <= 2):
                 bestSim = similarity
                 bestSign = signIdx
-
+        # check if the best match is good enough to justify template matching
         if bestSim < limit[bestSign]:
             if not templateMatching:
                 cv2.drawContours(contoursimg, [contour], -1, highlightColors[bestSign], 2)
@@ -152,12 +159,11 @@ while key != ord('q'):
                 cv2.fillPoly(mask, [contour], (0, 0, 0), offset=(-search_left, -search_top))
                 search_image = cv2.bitwise_or(search_image, mask)
 
-
                 best_min_val = 1
                 best_template = template
 
+                # for some signs orientation matters
                 for alpha in range(int(angle), int(360 + angle), int(360 / boundingbox_symmetry[bestSign])):
-#                    alpha = angle
                     rot = cv2.getRotationMatrix2D(signCenter, alpha, 1)
                     curtemplate = cv2.warpAffine(template, rot, (template.shape[0], template.shape[1]), borderValue=(255, 255, 255))
                     curtemplate = cv2.resize(curtemplate, (int(signWidth * scale), int(signHeight * scale)))
@@ -171,17 +177,20 @@ while key != ord('q'):
 #                print(best_min_val)
                 if best_min_val < templateThreshold[bestSign]:
                     if detections[bestSign] is None:
-                        detections[bestSign] = Detection(contour)
+                        detections[bestSign] = Detection(contour, origFrame)
                     else:
                         detections[bestSign].found(contour)
 
     for i, detection in enumerate(detections):
         if detection is None:
             continue
-        if detection.emptyFrames > maxEmptyFrames:
+        (success, box) = detection.tracker.update(origFrame)
+        if not success:
             detections[i] = None
-        else:
-            cv2.drawContours(contoursimg, [detection.contour], -1, highlightColors[i], 2)
+            continue
+        x, y, w, h = [int(v) for v in box]
+        cv2.rectangle(contoursimg, (x, y), (x+w, y+h), highlightColors[i], 2)
+#        cv2.drawContours(contoursimg, [detection.contour], -1, highlightColors[i], 2)
 
     cv2.imshow('contours', contoursimg)
 
