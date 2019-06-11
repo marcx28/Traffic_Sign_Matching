@@ -79,6 +79,9 @@ while key != ord('q'):
         templateMatching = not templateMatching
     if key == ord('p'):
         paused = not paused
+    if key == ord('r'):
+        for i in range(len(detections)):
+            detections[i] = None
 
     # change image source
     if key == ord('0'):
