@@ -65,7 +65,6 @@ key = cv2.waitKey(1)
 frame = None
 while key != ord('q'):
 
-    # automatically, while loop only has to run while paused if a setting has been changed
     key = cv2.waitKey(1 if not paused else 0)
 
     # options
