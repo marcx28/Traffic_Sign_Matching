@@ -1,14 +1,12 @@
 import cv2
-import sys
-import pytesseract
-import imutils
-import argparse
 import numpy as np
+import speedrec
 
 
 class Detection:
-    def __init__(self, contour, frame):
+    def __init__(self, contour, frame, speed):
         self.contour = contour
+        self.speed = speed
         self.emptyFrames = 0
         self.tracker = cv2.TrackerCSRT_create()
         self.tracker.init(frame, cv2.boundingRect(contour))
@@ -33,8 +31,8 @@ durchfahrtverboten = cv2.imread('durchfahrtverboten.jpg')
 names = ["stop sign", "vorrang geben", "vorrang straße", "durchfahrt verboten"]
 signs = [stopsign, vorfahrtsign, vorrangstrasse, durchfahrtverboten]
 limit = [.05, .05, 0.005, 0.005]
-templateThreshold = [0.25, 0.15, 0.15, .1]
-corners = [8, 3, 4, -15]
+templateThreshold = [0.25, 0.15, 0.15, .15]
+corners = [8, 3, 4, -12]
 highlightColors = [(255, 0, 0), (255, 0, 255), (0, 255, 0), (0, 255, 255)]
 # degrees offset of the sign from its best fit bounding box
 rotationoffset = [0, 0, 45, 0]
@@ -157,7 +155,8 @@ while key != ord('q'):
                 search_bot = min(origFrame.shape[1], int(y + height + margin))
                 search_left = max(0, int(x - margin))
                 search_right = min(origFrame.shape[1], int(x + width + margin))
-                search_image = cv2.cvtColor(origFrame[search_top:search_bot, search_left: search_right], cv2.COLOR_BGR2GRAY)
+                search_image_color = origFrame[search_top:search_bot, search_left: search_right]
+                search_image = cv2.cvtColor(search_image_color, cv2.COLOR_BGR2GRAY)
                 mask = np.ones(search_image.shape).astype(search_image.dtype)
                 cv2.fillPoly(mask, [contour], (0, 0, 0), offset=(-search_left, -search_top))
                 search_image = cv2.bitwise_or(search_image, mask)
@@ -179,8 +178,12 @@ while key != ord('q'):
 
 #                print(best_min_val)
                 if best_min_val < templateThreshold[bestSign]:
+                    speed = 0
+                    if bestSign == 3:
+                        speed = speedrec.get_speed_limit(search_image_color)
+                        print(speed)
                     if detections[bestSign] is None:
-                        detections[bestSign] = Detection(contour, origFrame)
+                        detections[bestSign] = Detection(contour, origFrame, speed)
                     else:
                         detections[bestSign].found(contour)
 
