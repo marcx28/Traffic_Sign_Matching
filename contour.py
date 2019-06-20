@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import speedrec
+import threading
 
 
 class Detection:
@@ -28,10 +29,11 @@ vorfahrtsign = cv2.imread('vorfahrt.jpg')
 vorrangstrasse = cv2.imread('vorrangstrasse.png')
 durchfahrtverboten = cv2.imread('durchfahrtverboten.jpg')
 
-names = ["stop sign", "vorrang geben", "vorrang straße", "durchfahrt verboten"]
+names = ["Stopschild", "Vorrang Geben", "Vorrangstraße", "Durchfahrt Verboten"]
 signs = [stopsign, vorfahrtsign, vorrangstrasse, durchfahrtverboten]
 limit = [.05, .05, 0.005, 0.005]
-templateThreshold = [0.25, 0.15, 0.15, .15]
+#templateThreshold = [0.25, 0.15, 0.15, .15]
+templateThreshold = [0.25, 0.25, 0.25, .35]
 corners = [8, 3, 4, -12]
 highlightColors = [(255, 0, 0), (255, 0, 255), (0, 255, 0), (0, 255, 255)]
 # degrees offset of the sign from its best fit bounding box
@@ -45,8 +47,7 @@ detections = [None for i in range(len(signs))]
 maxEmptyFrames = 500
 
 minContourArea = 200
-
-cv2.waitKey(0)
+videoScale = 1.0
 
 
 showAllContours = True
@@ -55,11 +56,24 @@ templateMatching = True
 paused = False
 cap = cv2.VideoCapture(0)#"Autofahrt.mp4")
 
+
+def detectSpeed(image, i):
+    speed = speedrec.get_speed_limit(image)
+    if detections[i] is not None:
+        detections[i].speed = speed
+
+
 for i in range(len(signs)):
     contour = sign_contours[i]
     outer_contour = find_outer_contour(contour)
     cv2.drawContours(signs[i], [outer_contour], -1, highlightColors[i], 5)
 #    cv2.imshow(names[i], signs[i])
+
+
+def clearDetections():
+    for i in range(len(detections)):
+        detections[i] = None
+
 
 key = cv2.waitKey(1)
 frame = None
@@ -80,15 +94,36 @@ while key != ord('q'):
         for i in range(len(detections)):
             detections[i] = None
 
+    # zoom
+    if key == ord('+'):
+        videoScale += 0.1
+    if key == ord('-'):
+        videoScale -= 0.1
+
     # change image source
     if key == ord('0'):
         cap = cv2.VideoCapture(0)
         paused = False
+        clearDetections()
     if key == ord('1'):
         cap = cv2.VideoCapture(1)
+        clearDetections()
+        paused = False
+    if key == ord('2'):
+        cap = cv2.VideoCapture('videos/Tempo70.mp4')
+        clearDetections()
+        paused = False
+    if key == ord('3'):
+        cap = cv2.VideoCapture('videos/VorrangGeben.mp4')
+        clearDetections()
+        paused = False
+    if key == ord('4'):
+        cap = cv2.VideoCapture('videos/Vorrangstrasse.mp4')
+        clearDetections()
         paused = False
     if key == ord('5'):
-        cap = cv2.VideoCapture('Autofahrt.mp4')
+        cap = cv2.VideoCapture('videos/Autofahrt.mp4')
+        clearDetections()
         paused = False
 
     if not paused:
@@ -177,11 +212,12 @@ while key != ord('q'):
 
 #                print(best_min_val)
                 if best_min_val < templateThreshold[bestSign]:
-                    speed = 0
-                    if bestSign == 3:
-                        speed = speedrec.get_speed_limit(search_image_color)
-                        print(speed)
                     if detections[bestSign] is None:
+                        speed = 0
+                        if bestSign == 3:
+                            speed = -1000
+                            t = threading.Thread(target=detectSpeed, args=(search_image_color, bestSign))
+                            t.start()
                         detections[bestSign] = Detection(contour, origFrame, speed)
                     else:
                         detections[bestSign].found(contour)
@@ -193,8 +229,18 @@ while key != ord('q'):
         if not success:
             detections[i] = None
             continue
+        if i == 3 and detection.speed == 0:
+            detections[i] = None
+            continue
         x, y, w, h = [int(v) for v in box]
         cv2.rectangle(contoursimg, (x, y), (x+w, y+h), highlightColors[i], 2)
+        text = names[i]
+        if detection.speed == -1000:
+            text = "Tempo erkennen..."
+        if detection.speed > 0:
+            text = "Tempo: " + str(detection.speed)
+
+        cv2.putText(contoursimg, text, (x, y+h+20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, highlightColors[i], 2)
 #        cv2.drawContours(contoursimg, [detection.contour], -1, highlightColors[i], 2)
 
     cv2.imshow('contours', contoursimg)
