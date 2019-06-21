@@ -86,8 +86,6 @@ def get_speed_limit(image):
     (rects, confidences) = decode_predictions(scores, geometry)
     boxes = non_max_suppression(np.array(rects), probs=confidences)
 
-    cv2.imshow("source", image)
-
     results = []
     for (startX, startY, endX, endY) in boxes:
         # revert stretching in beginning (cause of % 32)
@@ -105,9 +103,10 @@ def get_speed_limit(image):
         endX = min(origW, endX + (dX * 2))
         endY = min(origH, endY + (dY * 2))
 
+
         roi = orig[startY:endY, startX:endX]
-        cv2.imshow("text", roi)
         text = pytesseract.image_to_string(roi, config=config)
+#        cv2.imshow("roi", roi)
         results.append(text)
 
     for result in results:
